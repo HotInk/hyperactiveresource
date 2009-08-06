@@ -47,6 +47,7 @@ These are the features that have been added to HyRes.
  * ActiveRecord-like #load that doesn't #dup attributes (stores direct reference)
  * reload that does a full clear/fetch to reload (also clears associations
    cache!)
+ * Rudimentary support for OAuth requests
 
 
 == Callbacks
@@ -91,12 +92,32 @@ These are the features that have been added to HyRes.
    prefix-path, and will pre-populate the parent's id when you do an
    association collection_fetch.
 
+=== OAuth Support
+
+This fork of HyperactiveResource has basic support for API requests via an OAuth
+access token. When an access token is available, HyperactiveResouce will defer
+to that access token for it's HTTP connection. This feature requires the 
+OAuth gem ("sudo gem install oauth") to function.
+
+In order to request resources using an OAuth access token, rather than 
+ActiveResource::Connection, simple pass along your access token using an "as" key.
+The "as" key is used because this access token is identifying your application 
+(or your application's user) to the remote service, eg:
+
+	Widget.find(:all, :account_id => "2", :name => "wodget", :as => @oauth_access_token )
+	Widget.find(4, :as => @oauth_access_token)
+
+In order to find or update the resource during process, simply set it's access_token 
+attribute before saving or updating the record. This must be done even if the resource
+has been requested with an OAuth find request, as above.
+
+	@widget = Widget.new(:name => "shoelace tool")
+	@widget.access_token = @oauth_access_token
+
 
 === Other weird stuff
  * raw_data(:format => X) - access the raw data sent by the remote
      API (see explanation and use below)
-
-
 
 
 == find and Your API
