@@ -676,7 +676,7 @@ class HyperactiveResource < ActiveResource::Base
       if !opts.blank?
         # setup a nested resource route for this belongs_to association.
         if opts.has_key?(:nested) && opts[:nested] 
-          raise ArgumentError, "the nested option can only deal with a single association at present, you passed #{names.length}" if names.blank? || (names.acts_like?(:array) && names.length != 1)
+          raise ArgumentError, "the nested option can only be applied to a single association, you passed #{names.length}. To nest deeper, apply the nested option to a belongs_to association in the 'nest' class." if names.blank? || (names.acts_like?(:array) && names.length != 1)
           # dearrayify if necessary
           the_name = names.acts_like?(:array) ? names[0] : names
           self.nested = the_name
@@ -794,7 +794,7 @@ class HyperactiveResource < ActiveResource::Base
         # first -double-check that the id-fetch didn't auto-load the
         # associated objects while finding the ids, otherwise we'll be
         # doubling up on finds.
-        association_name = self.class.remove_id(name).pluralize #(residency_ids => residencies)
+        association_name = self.class.remove_id(name).pluralize # Why is this line here? Where is it used? --CD # (residency_ids => residencies)
         return attributes[name] if attributes.has_key?(name)
 
         # didn't find any, get them all via individual finds
@@ -872,11 +872,27 @@ class HyperactiveResource < ActiveResource::Base
     # for you - and will be called appropriately in the collection_fetch for
     # association-fetching
     def self.nested=(name)
-      # generate a quick-trick prefix path on the nested resource and pass
-      # in the required prefix option which is our own id
-      the_class_name = name.to_s.underscore
-      # add the nested resource as a prefix-path
-      self.prefix = "/#{the_class_name.pluralize}/:#{the_class_name}_id/"
+      
+      # Walk back through nested classes to find all the necessary prefix options
+      begin
+        the_prefix = ""  
+        nest_class_name = name.to_s
+        nest_class = self.const_get(nest_class_name.camelize)               
+        while nest_class.nested do
+          the_class_name = nest_class_name.underscore
+          the_prefix =  "#{nest_class_name.underscore.pluralize}/:#{the_class_name}_id/" + the_prefix
+          
+          # Set up next loop
+          nest_class_name = nest_class.nested.to_s
+          nest_class = self.const_get(nest_class.nested.to_s.camelize) # This may kick us out of the loop with NameError
+        end
+      rescue NameError
+      ensure
+        the_class_name = nest_class_name.underscore
+        the_prefix = "/#{the_class_name.pluralize}/:#{the_class_name}_id/" + the_prefix
+      end
+      
+      self.prefix = the_prefix
       @nested = name
     end
     # just returns the current value for "nested"
